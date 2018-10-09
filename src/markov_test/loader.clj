@@ -1,18 +1,12 @@
-(ns markov-test.loader)
+(ns markov-test.loader
+  (:require [clojure.java.io :as io]))
 
 (def valid-line #"\d{2}+:\d{2}+ (<[@| ][a-zA-Z^]+>| \* [a-zA-Z^]+) (.*)")
 
-(defn process-file-by-lines
-  "Process file reading it line-by-line"
-  ([file]
-   (process-file-by-lines file identity))
-  ([file process-fn]
-   (process-file-by-lines file process-fn println))
-  ([file process-fn output-fn]
-   (with-open [rdr (clojure.java.io/reader file :encoding "ISO-8859-1")]
-     (doseq [line (line-seq rdr)]
-       (output-fn
-         (process-fn line))))))
+(defn process-file-by-lines-transduce
+  [file xf f]
+  (with-open [rdr (io/reader file :encoding "ISO-8859-1")]
+    (transduce xf f (line-seq rdr))))
 
 (defn parse-line [s]
   (let [[_ _ res] (re-matches valid-line s)]
@@ -38,15 +32,14 @@
     m
     (recur (increase-word m (first pairs)) (rest pairs))))
 
-(defn process-words [starting-words chain words]
-  (do
-    (swap! starting-words conj (first words))
-    (swap! chain process-pairs (make-pairs words))))
+(defn chain-builder-transduce
+  ([]
+   [#{} {}])
+  ([x]
+   x)
+  ([[starting-words chain] words]
+   [(conj starting-words (first words)) (process-pairs chain (make-pairs words))]))
 
 (defn build-chain [filename]
-  (let [starting-words (atom #{})
-        chain (atom {})]
-    (do
-      (process-file-by-lines filename line->words #(process-words starting-words chain %))
-      [@starting-words @chain])))
-
+  (let [xf (comp (map line->words) (remove nil?))]
+    (process-file-by-lines-transduce filename xf chain-builder-transduce)))
