@@ -13,24 +13,21 @@
     res))
 
 (defn parse-words [s]
-  (if s (clojure.string/split s #"\s+")))
+  (when s (clojure.string/split s #"\s+")))
 
 (def line->words
   (comp parse-words parse-line))
 
 (defn increase-word [m [word1 word2]]
-  (let [prev-map (get m word1 {word2 0 :total 0})
-        new-map (assoc prev-map word2 (inc (get prev-map word2 0))
-                                :total (inc (get prev-map :total)))]
-    (assoc m word1 new-map)))
+  (-> m
+      (update-in [word1 word2] (fnil inc 0))
+      (update-in [word1 :total] (fnil inc 0))))
 
 (defn make-pairs [words]
   (partition 2 1 [:end] words))
 
 (defn process-pairs [m pairs]
-  (if (empty? pairs)
-    m
-    (recur (increase-word m (first pairs)) (rest pairs))))
+  (reduce increase-word m pairs))
 
 (defn chain-builder-transduce
   ([]
